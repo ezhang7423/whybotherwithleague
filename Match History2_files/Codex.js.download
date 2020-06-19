@@ -1,0 +1,70 @@
+JSoop.define('Codex', {
+    singleton: true,
+
+    getContextUser: function () {
+        var me = this;
+
+        if (!me.contextUser) {
+            me.contextUser = JSoop.create('Codex.model.User');
+        }
+
+        return me.contextUser;
+    },
+
+    setContextUser: function (id, type) {
+        var me = this,
+            currentUser = me.getCurrentUser(),
+            contextUser = me.getContextUser(),
+            participants = Ramen.getCollection('Participants'),
+            participant;
+
+        if (!id) {
+            contextUser.set({
+                type: 'auth',
+                id: currentUser.get('id'),
+                region: currentUser.get('region')
+            });
+        } else {
+            if (!type) {
+                type = 'auth';
+
+                if (id !== currentUser.get('id')) {
+                    type = 'original';
+                }
+            }
+
+            contextUser.set('id', id);
+            contextUser.set('type', type);
+        }
+
+        participant = contextUser.findParticipant(participants);
+
+        if (participant && participant.get('region')) {
+            contextUser.set('region', participant.get('region'));
+        } else {
+            participants.on('add', me.onParticipantsAdd, me);
+        }
+    },
+
+    onParticipantsAdd: function (collection, added) {
+        var me = this,
+            contextUser = me.getContextUser(),
+            user;
+
+        JSoop.each(added, function (participant) {
+            if (contextUser.isParticipant(participant)) {
+                user = participant;
+
+                return false;
+            }
+        });
+
+        if (!user) {
+            return;
+        }
+
+        contextUser.set('region', user.get('region'));
+
+        collection.off('add', me.onParticipantsAdd, me);
+    }
+});
